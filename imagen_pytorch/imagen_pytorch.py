@@ -389,7 +389,7 @@ class PerceiverAttention(nn.Module):
         self,
         *,
         dim,
-        dim_head = 64,
+        dim_head = 32,
         heads = 8
     ):
         super().__init__()
@@ -446,7 +446,7 @@ class PerceiverResampler(nn.Module):
         *,
         dim,
         depth,
-        dim_head = 64,
+        dim_head = 32,
         heads = 8,
         num_latents = 64,
         num_latents_mean_pooled = 4, # number of latents derived from mean pooled representation of the sequence
@@ -500,7 +500,7 @@ class Attention(nn.Module):
         self,
         dim,
         *,
-        dim_head = 64,
+        dim_head = 32,
         heads = 8,
         context_dim = None
     ):
@@ -711,7 +711,7 @@ class CrossAttention(nn.Module):
         dim,
         *,
         context_dim = None,
-        dim_head = 64,
+        dim_head = 32,
         heads = 8,
         norm_context = False
     ):
