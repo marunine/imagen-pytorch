@@ -1173,7 +1173,7 @@ class Unet(nn.Module):
             self.downs.append(nn.ModuleList([
                 downsample_klass(dim_in, dim_out = dim_out) if memory_efficient else None,
                 ResnetBlock(dim_out if memory_efficient else dim_in, dim_out, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, skip_connection_scale = skip_connect_scale),
-                nn.ModuleList([ResnetBlock(dim_out, dim_out, groups = groups, use_gca = use_global_context_attn, skip_connection_scale = skip_connect_scale) for _ in range(layer_num_resnet_blocks)]),
+                nn.ModuleList([ResnetBlock(dim_out, dim_out, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn, skip_connection_scale = skip_connect_scale) for _ in range(layer_num_resnet_blocks)]),
                 transformer_block_klass(dim = dim_out, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult),
                 downsample_klass(dim_out) if not memory_efficient and not is_last else None,
             ]))
@@ -1192,7 +1192,7 @@ class Unet(nn.Module):
 
             self.ups.append(nn.ModuleList([
                 ResnetBlock(dim_out * 2, dim_in, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, skip_connection_scale = skip_connect_scale),
-                nn.ModuleList([ResnetBlock(dim_in, dim_in, groups = groups, skip_connection_scale = skip_connect_scale, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
+                nn.ModuleList([ResnetBlock(dim_in, dim_in, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, skip_connection_scale = skip_connect_scale, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
                 transformer_block_klass(dim = dim_in, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult),
                 Upsample(dim_in) if not is_last or memory_efficient else nn.Identity()
             ]))
@@ -1393,7 +1393,7 @@ class Unet(nn.Module):
             x = init_block(x, c, t)
 
             for resnet_block in resnet_blocks:
-                x = resnet_block(x)
+                x = resnet_block(x, c, t)
 
             x = attn_block(x)
             hiddens.append(x)
@@ -1413,7 +1413,7 @@ class Unet(nn.Module):
             x = init_block(x, c, t)
 
             for resnet_block in resnet_blocks:
-                x = resnet_block(x)
+                x = resnet_block(x, c, t)
 
             x = attn_block(x)
             x = upsample(x)
