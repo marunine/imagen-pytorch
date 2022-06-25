@@ -1,5 +1,6 @@
 import math
 import copy
+from turtle import down
 from typing import List
 from tqdm import tqdm
 from functools import partial, wraps
@@ -544,12 +545,12 @@ class Attention(nn.Module):
 
 # decoder
 
-def Upsample(dim):
-    return nn.ConvTranspose2d(dim, dim, 4, 2, 1)
+def Upsample(dim, kernel_size = 4, stride = 2):
+    return nn.ConvTranspose2d(dim, dim, kernel_size, stride, 1)
 
-def Downsample(dim, *, dim_out = None):
+def Downsample(dim, *, dim_out = None, kernel_size = 4, stride = 2):
     dim_out = default(dim_out, dim)
-    return nn.Conv2d(dim, dim_out, 4, 2, 1)
+    return nn.Conv2d(dim, dim_out, kernel_size, stride, 1)
 
 class Scale(nn.Module):
     """ scaling skip connection by 1 / sqrt(2), purportedly speeds up convergence in a number of papers """
@@ -992,6 +993,8 @@ class Unet(nn.Module):
         scale_resnet_skip_connection = True,
         final_resnet_block = True,
         final_conv_kernel_size = 3,
+        down_up_kernel = 4,
+        down_up_stride = 2,
         downsample_concat_hiddens_earlier = False    # for debugging artifacts in memory efficient unet (allows for one to concat the hiddens a bit earlier, right after the downsample)
     ):
         super().__init__()
@@ -1176,11 +1179,11 @@ class Unet(nn.Module):
             transformer_block_klass = TransformerBlock if layer_attn else (LinearAttentionTransformerBlock if use_linear_attn else nn.Identity)
 
             self.downs.append(nn.ModuleList([
-                downsample_klass(dim_in) if memory_efficient else None,
+                downsample_klass(dim_in, kernel_size=down_up_kernel, stride=down_up_stride) if memory_efficient else None,
                 ResnetBlock(dim_in, dim_out, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, skip_connection_scale = skip_connect_scale),
                 nn.ModuleList([ResnetBlock(dim_out, dim_out, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn, skip_connection_scale = skip_connect_scale) for _ in range(layer_num_resnet_blocks)]),
                 transformer_block_klass(dim = dim_out, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult),
-                downsample_klass(dim_out) if not memory_efficient and not is_last else None,
+                downsample_klass(dim_out, kernel_size=down_up_kernel, stride=down_up_stride) if not memory_efficient and not is_last else None,
             ]))
 
         mid_dim = dims[-1]
@@ -1199,7 +1202,7 @@ class Unet(nn.Module):
                 ResnetBlock(dim_out * 2, dim_in, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, skip_connection_scale = skip_connect_scale),
                 nn.ModuleList([ResnetBlock(dim_in, dim_in, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups, skip_connection_scale = skip_connect_scale, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
                 transformer_block_klass(dim = dim_in, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult),
-                Upsample(dim_in) if not is_last or memory_efficient else nn.Identity()
+                Upsample(dim_in, kernel_size=down_up_kernel, stride=down_up_stride) if not is_last or memory_efficient else nn.Identity()
             ]))
 
         # whether to do a final residual from initial conv to the final resnet block out
