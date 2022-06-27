@@ -1591,16 +1591,18 @@ class Imagen(nn.Module):
 
         # construct noise schedulers
 
-        noise_scheduler_klass = GaussianDiffusion if not continuous_times else GaussianDiffusionContinuousTimes
+        continuous_times = cast_tuple(continuous_times, num_unets)
         self.noise_schedulers = nn.ModuleList([])
 
-        for timestep, noise_schedule in zip(timesteps, noise_schedules):
+        for timestep, noise_schedule, use_continuous in zip(timesteps, noise_schedules, continuous_times):
+            noise_scheduler_klass = GaussianDiffusion if not use_continuous else GaussianDiffusionContinuousTimes
             noise_scheduler = noise_scheduler_klass(noise_schedule = noise_schedule, timesteps = timestep)
             self.noise_schedulers.append(noise_scheduler)
 
         # lowres augmentation noise schedule
 
-        self.lowres_noise_schedule = GaussianDiffusionContinuousTimes(noise_schedule = 'cosine', timesteps = 1000)
+        lowres_unet = min(1, num_unets - 1)
+        self.lowres_noise_schedule = self.noise_schedulers[lowres_unet]
 
         # ddpm objectives - predicting noise by default
 
@@ -1625,7 +1627,7 @@ class Imagen(nn.Module):
                 text_embed_dim = self.text_embed_dim if self.condition_on_text else None,
                 channels = self.channels,
                 channels_out = self.channels,
-                learned_sinu_pos_emb = not continuous_times
+                learned_sinu_pos_emb = not continuous_times[ind]
             )
 
             self.unets.append(one_unet)
