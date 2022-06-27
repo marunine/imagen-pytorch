@@ -1600,7 +1600,7 @@ class Imagen(nn.Module):
 
         # lowres augmentation noise schedule
 
-        self.lowres_noise_schedule = GaussianDiffusionContinuousTimes(noise_schedule = 'linear', timesteps = 1000)
+        self.lowres_noise_schedule = GaussianDiffusionContinuousTimes(noise_schedule = 'cosine', timesteps = 1000)
 
         # ddpm objectives - predicting noise by default
 
