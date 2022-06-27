@@ -1261,13 +1261,11 @@ class Unet(nn.Module):
         channels,
         channels_out,
         cond_on_text,
-        learned_sinu_pos_emb
     ):
         if lowres_cond == self.lowres_cond and \
             channels == self.channels and \
             cond_on_text == self.cond_on_text and \
             text_embed_dim == self._locals['text_embed_dim'] and \
-            learned_sinu_pos_emb == self.learned_sinu_pos_emb and \
             channels_out == self.channels_out:
             return self
 
@@ -1277,7 +1275,6 @@ class Unet(nn.Module):
             channels = channels,
             channels_out = channels_out,
             cond_on_text = cond_on_text,
-            learned_sinu_pos_emb = learned_sinu_pos_emb
         )
 
         return self.__class__(**{**self._locals, **updated_kwargs})
@@ -1627,7 +1624,6 @@ class Imagen(nn.Module):
                 text_embed_dim = self.text_embed_dim if self.condition_on_text else None,
                 channels = self.channels,
                 channels_out = self.channels,
-                learned_sinu_pos_emb = not continuous_times[ind]
             )
 
             self.unets.append(one_unet)
