@@ -103,7 +103,11 @@ def resize_image_to(image, target_image_size):
         return image
 
     scale_factors = target_image_size / orig_image_size
-    return resize(image, scale_factors = scale_factors)
+
+    if orig_image_size > target_image_size:
+        return resize(image, scale_factors = scale_factors)
+    else:
+        return F.interpolate(image, target_image_size, mode='bilinear')
 
 # image normalization functions
 # ddpms expect images to be in the range of -1 to 1
