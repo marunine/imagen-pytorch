@@ -1664,7 +1664,7 @@ class Imagen(nn.Module):
         self.p2_loss_weight_k = p2_loss_weight_k
         self.p2_loss_weight_gamma = cast_tuple(p2_loss_weight_gamma, num_unets)
 
-        assert all([(gamma_value <= 2) for gamma_value in self.p2_loss_weight_gamma]), 'in paper, they noticed any gamma greater than 2 is harmful'
+        # assert all([(gamma_value <= 2) for gamma_value in self.p2_loss_weight_gamma]), 'in paper, they noticed any gamma greater than 2 is harmful'
 
         # one temp parameter for keeping track of device
 
