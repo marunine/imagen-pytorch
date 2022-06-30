@@ -116,7 +116,7 @@ def resize_image_to(image, target_image_size):
         return image
 
     scale_factors = target_image_size / orig_image_size
-    return resize(image, scale_factors = scale_factors)
+    return resize(image, scale_factors = scale_factors).clamp(-1, 1)
 
 # image normalization functions
 # ddpms expect images to be in the range of -1 to 1
