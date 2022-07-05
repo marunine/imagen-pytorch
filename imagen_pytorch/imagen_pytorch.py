@@ -1271,9 +1271,16 @@ class Unet(nn.Module):
 
             skip_connect_dim = skip_connect_dims.pop()
 
+            if inner_conditioning:
+                inner_use_linear = layer_use_linear_cross_attn
+                inner_cond_dim = layer_cond_dim
+            else:
+                inner_use_linear = None
+                inner_cond_dim = None
+
             self.ups.append(nn.ModuleList([
                 ResnetBlock(dim_out + skip_connect_dim, dim_out, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups),
-                nn.ModuleList([ResnetBlock(dim_out + skip_connect_dim, dim_out, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
+                nn.ModuleList([ResnetBlock(dim_out + skip_connect_dim, dim_out, cond_dim = inner_cond_dim, linear_attn = inner_use_linear, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
                 transformer_block_klass(dim = dim_out, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult, context_dim = cond_dim),
                 Upsample(dim_out, dim_in) if not is_last or memory_efficient else Identity()
             ]))
@@ -1503,7 +1510,7 @@ class Unet(nn.Module):
 
             for resnet_block in resnet_blocks:
                 x = add_skip_connection(x)
-                x = resnet_block(x, t)
+                x = resnet_block(x, t, c)
 
             x = attn_block(x, c)
             x = upsample(x)
