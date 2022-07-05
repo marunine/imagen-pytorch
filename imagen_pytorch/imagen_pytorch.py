@@ -1026,6 +1026,7 @@ class Unet(nn.Module):
         attn_pool_text = True,
         attn_pool_num_latents = 32,
         dropout = 0.,
+        inner_conditioning = False,
         memory_efficient = False,
         init_conv_to_final_conv_residual = False,
         use_global_context_attn = True,
@@ -1217,6 +1218,13 @@ class Unet(nn.Module):
             layer_use_linear_cross_attn = not layer_cross_attn and use_linear_cross_attn
             layer_cond_dim = cond_dim if layer_cross_attn or layer_use_linear_cross_attn else None
 
+            if inner_conditioning:
+                inner_use_linear = layer_use_linear_cross_attn
+                inner_cond_dim = layer_cond_dim
+            else:
+                inner_use_linear = None
+                inner_cond_dim = None
+
             transformer_block_klass = TransformerBlock if layer_attn else (LinearAttentionTransformerBlock if use_linear_attn else Identity)
 
             current_dim = dim_in
@@ -1240,7 +1248,7 @@ class Unet(nn.Module):
             self.downs.append(nn.ModuleList([
                 pre_downsample,
                 ResnetBlock(current_dim, current_dim, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups),
-                nn.ModuleList([ResnetBlock(current_dim, current_dim, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
+                nn.ModuleList([ResnetBlock(current_dim, current_dim, cond_dim = inner_cond_dim, linear_attn = inner_use_linear, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
                 transformer_block_klass(dim = current_dim, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult, context_dim = cond_dim),
                 post_downsample
             ]))
@@ -1471,7 +1479,7 @@ class Unet(nn.Module):
             x = init_block(x, t, c)
 
             for resnet_block in resnet_blocks:
-                x = resnet_block(x, t)
+                x = resnet_block(x, t, c)
                 hiddens.append(x)
 
             x = attn_block(x, c)
