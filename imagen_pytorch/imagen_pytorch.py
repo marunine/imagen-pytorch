@@ -118,9 +118,14 @@ def resize_image_to(image, target_image_size):
     scale_factors = target_image_size / orig_image_size
 
     if target_image_size < orig_image_size:
-        image = resize(image, scale_factors = scale_factors)
+        image = resize(image, scale_factors=scale_factors, pad_mode='reflect')
     else:
-        image = resize(image, scale_factors = scale_factors, interp_method=interp_methods.box, antialiasing=False)
+        image = resize(
+            image,
+            scale_factors=scale_factors,
+            interp_method=interp_methods.box,
+            antialiasing=False,
+            pad_mode='reflect')
 
     return image.clamp(-1, 1)
 
