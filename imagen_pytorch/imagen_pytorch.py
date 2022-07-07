@@ -18,7 +18,7 @@ from einops.layers.torch import Rearrange, Reduce
 from einops_exts import rearrange_many, repeat_many, check_shape
 from einops_exts.torch import EinopsToAndFrom
 
-from resize_right import resize
+from resize_right import resize, interp_methods
 
 from imagen_pytorch.t5 import t5_encode_text, get_encoded_dim, DEFAULT_T5_NAME
 
@@ -116,7 +116,13 @@ def resize_image_to(image, target_image_size):
         return image
 
     scale_factors = target_image_size / orig_image_size
-    return resize(image, scale_factors = scale_factors).clamp(-1, 1)
+
+    if target_image_size < orig_image_size:
+        image = resize(image, scale_factors = scale_factors)
+    else:
+        image = resize(image, scale_factors = scale_factors, interp_method=interp_methods.box, antialiasing=False)
+
+    return image.clamp(-1, 1)
 
 # image normalization functions
 # ddpms expect images to be in the range of -1 to 1
