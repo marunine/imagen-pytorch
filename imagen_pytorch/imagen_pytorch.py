@@ -595,9 +595,9 @@ def Upsample(dim, dim_out = None):
         nn.Conv2d(dim, dim_out, 3, padding = 1)
     )
 
-def Downsample(dim, dim_out = None):
+def Downsample(dim, dim_out = None, kernel_size = 4, stride = 2, padding = 1):
     dim_out = default(dim_out, dim)
-    return nn.Conv2d(dim, dim_out, 4, 2, 1)
+    return nn.Conv2d(dim, dim_out, kernel_size=kernel_size, stride=stride, padding=padding)
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
@@ -1039,6 +1039,8 @@ class Unet(nn.Module):
         dropout = 0.,
         inner_conditioning = False,
         reduce_inner_conv = False,
+        downsample_kernel_size=4,
+        downsample_stride=2,
         memory_efficient = False,
         init_conv_to_final_conv_residual = False,
         use_global_context_attn = True,
@@ -1249,7 +1251,7 @@ class Unet(nn.Module):
             pre_downsample = None
 
             if memory_efficient:
-                pre_downsample = downsample_klass(dim_in, dim_out)
+                pre_downsample = downsample_klass(dim_in, dim_out, kernel_size=downsample_kernel_size, stride=downsample_stride)
                 current_dim = dim_out
 
             skip_connect_dims.append(current_dim)
@@ -1258,7 +1260,7 @@ class Unet(nn.Module):
 
             post_downsample = None
             if not memory_efficient:
-                post_downsample = downsample_klass(current_dim, dim_out) if not is_last else Parallel(nn.Conv2d(dim_in, dim_out, 3, padding = 1), nn.Conv2d(dim_in, dim_out, 1))
+                post_downsample = downsample_klass(current_dim, dim_out, kernel_size=downsample_kernel_size, stride=downsample_stride) if not is_last else Parallel(nn.Conv2d(dim_in, dim_out, 3, padding = 1), nn.Conv2d(dim_in, dim_out, 1))
 
             self.downs.append(nn.ModuleList([
                 pre_downsample,
