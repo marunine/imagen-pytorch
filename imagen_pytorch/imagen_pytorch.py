@@ -1038,6 +1038,7 @@ class Unet(nn.Module):
         attn_pool_num_latents = 32,
         dropout = 0.,
         inner_conditioning = False,
+        reduce_inner_conv = False,
         memory_efficient = False,
         init_conv_to_final_conv_residual = False,
         use_global_context_attn = True,
@@ -1082,7 +1083,10 @@ class Unet(nn.Module):
 
         # initial convolution
 
-        self.init_conv = CrossEmbedLayer(init_channels, dim_out = init_dim, kernel_sizes = init_cross_embed_kernel_sizes, stride = 1)
+        if not reduce_inner_conv:
+            self.init_conv = CrossEmbedLayer(init_channels, dim_out = init_dim, kernel_sizes = init_cross_embed_kernel_sizes, stride = 1)
+        else:
+            self.init_conv = nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=3, stride=1, padding=1)
 
         dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
