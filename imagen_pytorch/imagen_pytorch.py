@@ -76,6 +76,14 @@ def pad_tuple_to_length(t, length, fillvalue = None):
         return t
     return (*t, *((fillvalue,) * remain_length))
 
+def zero_module(module):
+    """
+    Zero out the parameters of a module and return it.
+    """
+    for p in module.parameters():
+        p.detach().zero_()
+    return module
+
 # helper classes
 
 class Identity(nn.Module):
@@ -957,10 +965,10 @@ def ChanFeedForward(dim, mult = 2):  # in paper, it seems for self attention lay
     hidden_dim = int(dim * mult)
     return nn.Sequential(
         ChanLayerNorm(dim),
-        nn.Conv2d(dim, hidden_dim, 1, bias = False),
+        zero_module(nn.Conv2d(dim, hidden_dim, 1, bias = False)),
         nn.GELU(),
         ChanLayerNorm(hidden_dim),
-        nn.Conv2d(hidden_dim, dim, 1, bias = False)
+        zero_module(nn.Conv2d(hidden_dim, dim, 1, bias = False))
     )
 
 class TransformerBlock(nn.Module):
@@ -1022,7 +1030,7 @@ class CrossEmbedLayer(nn.Module):
 
         self.convs = nn.ModuleList([])
         for kernel, dim_scale in zip(kernel_sizes, dim_scales):
-            self.convs.append(nn.Conv2d(dim_in, dim_scale, kernel, stride = stride, padding = (kernel - stride) // 2))
+            self.convs.append(zero_module(nn.Conv2d(dim_in, dim_scale, kernel, stride = stride, padding = (kernel - stride) // 2)))
 
     def forward(self, x):
         fmaps = tuple(map(lambda conv: conv(x), self.convs))
@@ -1119,7 +1127,7 @@ class Unet(nn.Module):
         if not reduce_inner_conv:
             self.init_conv = CrossEmbedLayer(init_channels, dim_out = init_dim, kernel_sizes = init_cross_embed_kernel_sizes, stride = 1)
         else:
-            self.init_conv = nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=3, stride=1, padding=1)
+            self.init_conv = zero_module(nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=3, stride=1, padding=1))
 
         dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
@@ -1347,7 +1355,7 @@ class Unet(nn.Module):
         self.final_res_block = ResnetBlock(final_conv_dim, dim, time_cond_dim = time_cond_dim, groups = resnet_groups[0], use_gca = use_global_context_attn) if final_resnet_block else None
 
         final_conv_dim_in = dim if final_resnet_block else final_conv_dim
-        self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2)
+        self.final_conv = zero_module(nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2))
 
     # if the current settings for the unet are not correct
     # for cascading DDPM, then reinit the unet with the right settings
