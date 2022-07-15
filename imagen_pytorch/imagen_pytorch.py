@@ -1085,6 +1085,7 @@ class Unet(nn.Module):
         scale_skip_connection = True,
         final_resnet_block = True,
         final_conv_kernel_size = 3,
+        patch_size = 1,
         pixel_shuffle_upsample = False        # may address checkboard artifacts
     ):
         super().__init__()
@@ -1121,6 +1122,12 @@ class Unet(nn.Module):
         self.cond_images_channels = cond_images_channels
 
         init_channels += cond_images_channels
+
+        # patching
+
+        self.patch_size = patch_size
+        init_channels = init_channels * self.patch_size ** 2
+        self.channels_out = self.channels_out * self.patch_size ** 2
 
         # initial convolution
 
@@ -1433,6 +1440,11 @@ class Unet(nn.Module):
             cond_images = resize_image_to(cond_images, x.shape[-1])
             x = torch.cat((cond_images, x), dim = 1)
 
+        # patching
+
+        if self.patch_size > 1:
+            x = F.pixel_unshuffle(x, self.patch_size)
+
         # initial convolution
 
         x = self.init_conv(x)
@@ -1583,7 +1595,12 @@ class Unet(nn.Module):
         if exists(self.final_res_block):
             x = self.final_res_block(x, t)
 
-        return self.final_conv(x)
+        x = self.final_conv(x)
+
+        if self.patch_size > 1:
+            x = F.pixel_shuffle(x, self.patch_size)
+
+        return x
 
 # predefined unets, with configs lining up with hyperparameters in appendix of paper
 
