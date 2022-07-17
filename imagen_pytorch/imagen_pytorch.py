@@ -76,14 +76,6 @@ def pad_tuple_to_length(t, length, fillvalue = None):
         return t
     return (*t, *((fillvalue,) * remain_length))
 
-def zero_module(module):
-    """
-    Zero out the parameters of a module and return it.
-    """
-    for p in module.parameters():
-        p.detach().zero_()
-    return module
-
 # helper classes
 
 class Identity(nn.Module):
@@ -1378,7 +1370,7 @@ class Unet(nn.Module):
         self.final_res_block = ResnetBlock(final_conv_dim, dim, time_cond_dim = time_cond_dim, groups = resnet_groups[0], use_gca = use_global_context_attn) if final_resnet_block else None
 
         final_conv_dim_in = dim if final_resnet_block else final_conv_dim
-        self.final_conv = zero_module(nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2))
+        self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2)
 
     # if the current settings for the unet are not correct
     # for cascading DDPM, then reinit the unet with the right settings
