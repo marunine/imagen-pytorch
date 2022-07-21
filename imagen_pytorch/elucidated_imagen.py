@@ -54,6 +54,7 @@ class ElucidatedImagen(nn.Module):
         auto_normalize_img = True,                  # whether to take care of normalizing the image from [0, 1] to [-1, 1] and back automatically - you can turn this off if you want to pass in the [-1, 1] ranged image yourself from the dataloader
         dynamic_thresholding = True,
         dynamic_thresholding_percentile = 0.9,      # unsure what this was based on perusal of paper
+        dynamic_thresholding_floor = 1.0,
         lowres_noise_schedule = 'linear',
         num_sample_steps = 32,                      # number of sampling steps
         sigma_min = 0.002,                          # min noise level
@@ -141,6 +142,7 @@ class ElucidatedImagen(nn.Module):
 
         self.dynamic_thresholding = cast_tuple(dynamic_thresholding, num_unets)
         self.dynamic_thresholding_percentile = dynamic_thresholding_percentile
+        self.dynamic_thresholding_floor = dynamic_thresholding_floor
 
         # elucidating parameters
 
@@ -207,7 +209,7 @@ class ElucidatedImagen(nn.Module):
             dim = -1
         )
 
-        s.clamp_(min = 1.)
+        s.clamp_(min = self.dynamic_thresholding_floor)
         s = right_pad_dims_to(x_start, s)
         return x_start.clamp(-s, s) / s
 
