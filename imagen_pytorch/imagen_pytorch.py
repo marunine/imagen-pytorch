@@ -1217,7 +1217,7 @@ class Unet(nn.Module):
 
         # attention pooling
 
-        self.attn_pool = PerceiverResampler(dim = cond_dim, depth = 2, dim_head = attn_dim_head, heads = attn_heads, num_latents = attn_pool_num_latents) if attn_pool_text else None
+        self.attn_pool = PerceiverResampler(dim = cond_dim, depth = 2, dim_head = attn_dim_head, heads = attn_heads, num_latents = attn_pool_num_latents, max_seq_len = self.max_text_len, ff_mult=ff_mult) if attn_pool_text else None
 
         # for classifier free guidance
 
