@@ -420,9 +420,8 @@ class ElucidatedImagen(nn.Module):
 
                 if unet.lowres_cond:
                     lowres_noise_times = self.lowres_noise_schedule.get_times(batch_size, lowres_sample_noise_level, device = device)
-
-                    lowres_cond_img = resize_image_to(img, image_size)
-                    lowres_cond_img, _ = self.lowres_noise_schedule.q_sample(x_start = lowres_cond_img, t = lowres_noise_times, noise = torch.randn_like(lowres_cond_img))
+                    lowres_cond_img, _ = self.lowres_noise_schedule.q_sample(x_start = img, t = lowres_noise_times, noise = torch.randn_like(img))
+                    lowres_cond_img = resize_image_to(lowres_cond_img, image_size)
 
                 shape = (batch_size, self.channels, image_size, image_size)
 
@@ -509,26 +508,30 @@ class ElucidatedImagen(nn.Module):
             lowres_aug_time = self.lowres_noise_schedule.sample_random_times(1, device = device)
             return repeat(lowres_aug_time, '1 -> b', b = batch_size)
 
-        lowres_cond_img = lowres_aug_times = None
+        lowres_cond_img = lowres_aug_times = lowres_cond_img_noisy = None
         if exists(prev_image_size):
+            # normalize to [-1, 1]
+            lowres_cond_img = maybe(self.normalize_img)(lowres_cond_img)
+
+            # resize to previous size
+
             lowres_cond_img = resize_image_to(images, prev_image_size)
-            lowres_cond_img = resize_image_to(lowres_cond_img, target_image_size)
+
+            # noise the lowres conditioning image
+            # at sample time, they then fix the noise level of 0.1 - 0.3
             lowres_aug_times = get_lowres_aug_times()
+            lowres_cond_img_noisy, _ = self.lowres_noise_schedule.q_sample(
+                x_start=lowres_cond_img, t=lowres_aug_times, noise=torch.randn_like(lowres_cond_img))
+
+            # resize to target size to add as conditioning image
+
+            lowres_cond_img_noisy = resize_image_to(lowres_cond_img_noisy, target_image_size)
 
         images = resize_image_to(images, target_image_size)
 
         # normalize to [-1, 1]
 
         images = self.normalize_img(images)
-        lowres_cond_img = maybe(self.normalize_img)(lowres_cond_img)
-
-        # noise the lowres conditioning image
-        # at sample time, they then fix the noise level of 0.1 - 0.3
-
-        lowres_cond_img_noisy = None
-        if exists(lowres_cond_img):
-            lowres_aug_times = get_lowres_aug_times()
-            lowres_cond_img_noisy, _ = self.lowres_noise_schedule.q_sample(x_start = lowres_cond_img, t = lowres_aug_times, noise = torch.randn_like(lowres_cond_img))
 
         # get the sigmas
 
