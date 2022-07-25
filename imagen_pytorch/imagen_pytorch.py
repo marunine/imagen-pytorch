@@ -1084,6 +1084,7 @@ class Unet(nn.Module):
         dropout = 0.,
         inner_conditioning = False,
         reduce_inner_conv = False,
+        proj_in_kernel_size=3,
         zero_proj_out = False,
         downsample_kernel_size=4,
         downsample_stride=2,
@@ -1142,7 +1143,7 @@ class Unet(nn.Module):
         if not reduce_inner_conv:
             self.init_conv = CrossEmbedLayer(init_channels, dim_out = init_dim, kernel_sizes = init_cross_embed_kernel_sizes, stride = 1)
         else:
-            self.init_conv = nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=3, stride=1, padding=1)
+            self.init_conv = nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=proj_in_kernel_size, stride=1, padding=proj_in_kernel_size // 2)
 
         dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
