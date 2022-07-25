@@ -692,6 +692,8 @@ class ResnetBlock(nn.Module):
         groups = 8,
         linear_attn = False,
         use_gca = False,
+        heads = 8,
+        dim_head = 32,
         squeeze_excite = False
     ):
         super().__init__()
@@ -707,14 +709,17 @@ class ResnetBlock(nn.Module):
         self.cross_attn = None
 
         if exists(cond_dim):
-            attn_klass = CrossAttention if not linear_attn else LinearCrossAttention
+            if not linear_attn:
+                attn_klass = partial(CrossAttention, dim_head = dim_head, heads = heads)
+            else:
+                attn_klass = LinearCrossAttention
 
             self.cross_attn = EinopsToAndFrom(
                 'b c h w',
                 'b (h w) c',
                 attn_klass(
                     dim = dim_out,
-                    context_dim = cond_dim
+                    context_dim = cond_dim,
                 )
             )
 
@@ -1088,6 +1093,8 @@ class Unet(nn.Module):
         zero_proj_out = False,
         downsample_kernel_size=4,
         downsample_stride=2,
+        cross_attn_heads = 8,
+        cross_attn_dim_head = 32,
         memory_efficient = False,
         init_conv_to_final_conv_residual = False,
         use_global_context_attn = True,
@@ -1320,9 +1327,31 @@ class Unet(nn.Module):
 
             self.downs.append(nn.ModuleList([
                 pre_downsample,
-                ResnetBlock(current_dim, current_dim, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups),
-                nn.ModuleList([ResnetBlock(current_dim, current_dim, cond_dim = inner_cond_dim, linear_attn = inner_use_linear, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
-                transformer_block_klass(dim = current_dim, depth = layer_attn_depth, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult, context_dim = cond_dim),
+                ResnetBlock(
+                    current_dim,
+                    current_dim,
+                    cond_dim=layer_cond_dim,
+                    heads = cross_attn_heads,
+                    dim_head = cross_attn_dim_head,
+                    linear_attn=layer_use_linear_cross_attn,
+                    time_cond_dim=time_cond_dim,
+                    groups=groups),
+                nn.ModuleList([ResnetBlock(current_dim,
+                                           current_dim,
+                                           cond_dim=inner_cond_dim,
+                                           heads = cross_attn_heads,
+                                           dim_head = cross_attn_dim_head,
+                                           linear_attn=inner_use_linear,
+                                           time_cond_dim=time_cond_dim,
+                                           groups=groups,
+                                           use_gca=use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
+                transformer_block_klass(
+                    dim=current_dim,
+                    depth=layer_attn_depth,
+                    heads=attn_heads,
+                    dim_head=attn_dim_head,
+                    ff_mult=ff_mult,
+                    context_dim=cond_dim),
                 post_downsample
             ]))
 
@@ -1330,9 +1359,11 @@ class Unet(nn.Module):
 
         mid_dim = dims[-1]
 
-        self.mid_block1 = ResnetBlock(mid_dim, mid_dim, cond_dim = cond_dim, time_cond_dim = time_cond_dim, groups = resnet_groups[-1])
+        self.mid_block1 = ResnetBlock(mid_dim, mid_dim, cond_dim=cond_dim, heads=cross_attn_heads, dim_head=cross_attn_dim_head,
+                                      time_cond_dim=time_cond_dim, groups=resnet_groups[-1])
         self.mid_attn = EinopsToAndFrom('b c h w', 'b (h w) c', Residual(Attention(mid_dim, **attn_kwargs))) if attend_at_middle else None
-        self.mid_block2 = ResnetBlock(mid_dim, mid_dim, cond_dim = cond_dim, time_cond_dim = time_cond_dim, groups = resnet_groups[-1])
+        self.mid_block2 = ResnetBlock(mid_dim, mid_dim, cond_dim=cond_dim, heads=cross_attn_heads, dim_head=cross_attn_dim_head,
+                                      time_cond_dim=time_cond_dim, groups=resnet_groups[-1])
 
         # upsample klass
 
@@ -1356,9 +1387,31 @@ class Unet(nn.Module):
                 inner_cond_dim = None
 
             self.ups.append(nn.ModuleList([
-                ResnetBlock(dim_out + skip_connect_dim, dim_out, cond_dim = layer_cond_dim, linear_attn = layer_use_linear_cross_attn, time_cond_dim = time_cond_dim, groups = groups),
-                nn.ModuleList([ResnetBlock(dim_out + skip_connect_dim, dim_out, cond_dim = inner_cond_dim, linear_attn = inner_use_linear, time_cond_dim = time_cond_dim, groups = groups, use_gca = use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
-                transformer_block_klass(dim = dim_out, depth = layer_attn_depth, heads = attn_heads, dim_head = attn_dim_head, ff_mult = ff_mult, context_dim = cond_dim),
+                ResnetBlock(
+                    dim_out + skip_connect_dim,
+                    dim_out,
+                    cond_dim=layer_cond_dim,
+                    heads=cross_attn_heads,
+                    dim_head=cross_attn_dim_head,
+                    linear_attn=layer_use_linear_cross_attn,
+                    time_cond_dim=time_cond_dim,
+                    groups=groups),
+                nn.ModuleList([ResnetBlock(dim_out + skip_connect_dim,
+                                           dim_out,
+                                           cond_dim=inner_cond_dim,
+                                           heads=cross_attn_heads,
+                                           dim_head=cross_attn_dim_head,
+                                           linear_attn=inner_use_linear,
+                                           time_cond_dim=time_cond_dim,
+                                           groups=groups,
+                                           use_gca=use_global_context_attn) for _ in range(layer_num_resnet_blocks)]),
+                transformer_block_klass(
+                    dim=dim_out,
+                    depth=layer_attn_depth,
+                    heads=attn_heads,
+                    dim_head=attn_dim_head,
+                    ff_mult=ff_mult,
+                    context_dim=cond_dim),
                 upsample_klass(dim_out, dim_in) if not is_last or memory_efficient else Identity()
             ]))
 
