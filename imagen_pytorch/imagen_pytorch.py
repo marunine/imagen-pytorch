@@ -1084,6 +1084,7 @@ class Unet(nn.Module):
         dropout = 0.,
         inner_conditioning = False,
         reduce_inner_conv = False,
+        zero_proj_out = False,
         downsample_kernel_size=4,
         downsample_stride=2,
         memory_efficient = False,
@@ -1371,6 +1372,10 @@ class Unet(nn.Module):
 
         final_conv_dim_in = dim if final_resnet_block else final_conv_dim
         self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2)
+
+        if zero_proj_out:
+            nn.init.zeros_(self.final_conv.weight)
+            nn.init.zeros_(self.final_conv.bias)
 
     # if the current settings for the unet are not correct
     # for cascading DDPM, then reinit the unet with the right settings
