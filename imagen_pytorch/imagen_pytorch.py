@@ -148,6 +148,26 @@ def prob_mask_like(shape, prob, device):
     else:
         return torch.zeros(shape, device = device).float().uniform_(0, 1) < prob
 
+# patching
+
+
+def to_patches(x, patch_size):
+    p = patch_size
+    B, C, H, W = x.shape
+
+    x = x.permute(0, 2, 3, 1).reshape(B, H, W // p, C * p)
+    x = x.permute(0, 2, 1, 3).reshape(B, W // p, H // p, C * p * p)
+    return x.permute(0, 3, 2, 1)
+
+
+def from_patches(x, patch_size):
+    p = patch_size
+    B, C, H, W = x.shape
+
+    x = x.permute(0, 3, 2, 1).reshape(B, W, H * p, C // p)
+    x = x.permute(0, 2, 1, 3).reshape(B, H * p, W * p, C // (p * p))
+    return x.permute(0, 3, 1, 2)
+
 # gaussian diffusion helper functions
 
 def extract(a, t, x_shape):
@@ -1510,7 +1530,7 @@ class Unet(nn.Module):
         # patching
 
         if self.patch_size > 1:
-            x = F.pixel_unshuffle(x, self.patch_size)
+            x = to_patches(x, self.patch_size)
 
         # initial convolution
 
@@ -1665,7 +1685,7 @@ class Unet(nn.Module):
         x = self.final_conv(x)
 
         if self.patch_size > 1:
-            x = F.pixel_shuffle(x, self.patch_size)
+            x = from_patches(x, self.patch_size)
 
         return x
 
