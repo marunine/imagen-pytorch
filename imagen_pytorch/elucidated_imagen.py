@@ -553,6 +553,8 @@ class ElucidatedImagen(nn.Module):
             lowres_noise_times = self.lowres_noise_schedule.get_condition(lowres_aug_times),
             lowres_cond_img = lowres_cond_img_noisy,
             cond_drop_prob = self.cond_drop_prob,
+            clamp=True,
+            dynamic_threshold=False,
         )
 
         # losses
