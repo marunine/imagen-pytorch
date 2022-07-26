@@ -168,6 +168,12 @@ def from_patches(x, patch_size):
     x = x.permute(0, 2, 1, 3).reshape(B, H * p, W * p, C // (p * p))
     return x.permute(0, 3, 1, 2)
 
+# group normalization helpers
+
+class GroupNorm32(nn.GroupNorm):
+    def forward(self, x: torch.Tensor):
+        return super().forward(x.float()).type(x.dtype)
+
 # gaussian diffusion helper functions
 
 def extract(a, t, x_shape):
@@ -1447,7 +1453,7 @@ class Unet(nn.Module):
 
         final_conv_dim_in = dim if final_resnet_block else final_conv_dim
 
-        self.final_norm = nn.Sequential(nn.GroupNorm(32, final_conv_dim_in), nn.SiLU()) if norm_at_end else Identity()
+        self.final_norm = nn.Sequential(GroupNorm32(32, final_conv_dim_in), nn.SiLU()) if norm_at_end else Identity()
         self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2)
 
         if zero_proj_out:
