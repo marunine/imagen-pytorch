@@ -1111,6 +1111,7 @@ class Unet(nn.Module):
         reduce_inner_conv = False,
         proj_in_kernel_size=3,
         zero_proj_out = False,
+        norm_at_end = False,
         downsample_kernel_size=4,
         downsample_stride=2,
         cross_attn_heads = 8,
@@ -1445,6 +1446,8 @@ class Unet(nn.Module):
         self.final_res_block = ResnetBlock(final_conv_dim, dim, time_cond_dim = time_cond_dim, groups = resnet_groups[0], use_gca = use_global_context_attn) if final_resnet_block else None
 
         final_conv_dim_in = dim if final_resnet_block else final_conv_dim
+
+        self.final_norm = nn.Sequential(nn.GroupNorm(32, final_conv_dim_in), nn.SiLU()) if norm_at_end else Identity()
         self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2)
 
         if zero_proj_out:
@@ -1682,6 +1685,7 @@ class Unet(nn.Module):
         if exists(self.final_res_block):
             x = self.final_res_block(x, t)
 
+        x = self.final_norm(x)
         x = self.final_conv(x)
 
         if self.patch_size > 1:
