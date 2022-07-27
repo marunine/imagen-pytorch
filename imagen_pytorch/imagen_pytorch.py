@@ -693,7 +693,7 @@ class Block(nn.Module):
         norm = True
     ):
         super().__init__()
-        self.groupnorm = nn.GroupNorm(groups, dim) if norm else Identity()
+        self.groupnorm = GroupNorm32(groups, dim) if norm else Identity()
         self.activation = nn.SiLU()
         self.project = nn.Conv2d(dim, dim_out, 3, padding = 1)
 
