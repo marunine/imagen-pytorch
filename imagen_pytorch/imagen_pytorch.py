@@ -1132,6 +1132,7 @@ class Unet(nn.Module):
         inner_conditioning = False,
         reduce_inner_conv = False,
         proj_in_kernel_size=3,
+        proj_in_kernel_stride=1,
         zero_proj_out = False,
         zero_resblock_proj_out = False,
         norm_at_end = False,
@@ -1145,6 +1146,7 @@ class Unet(nn.Module):
         scale_skip_connection = True,
         final_resnet_block = True,
         final_conv_kernel_size = 3,
+        final_conv_kernel_stride = 1,
         patch_size = 1,
         pixel_shuffle_upsample = False        # may address checkboard artifacts
     ):
@@ -1194,7 +1196,7 @@ class Unet(nn.Module):
         if not reduce_inner_conv:
             self.init_conv = CrossEmbedLayer(init_channels, dim_out = init_dim, kernel_sizes = init_cross_embed_kernel_sizes, stride = 1)
         else:
-            self.init_conv = nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=proj_in_kernel_size, stride=1, padding=proj_in_kernel_size // 2)
+            self.init_conv = nn.Conv2d(in_channels=init_channels, out_channels=init_dim, kernel_size=proj_in_kernel_size, stride=proj_in_kernel_stride, padding=proj_in_kernel_size // 2)
 
         dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
@@ -1473,7 +1475,7 @@ class Unet(nn.Module):
         final_conv_dim_in = dim if final_resnet_block else final_conv_dim
 
         self.final_norm = nn.Sequential(GroupNorm32(32, final_conv_dim_in), nn.SiLU()) if norm_at_end else Identity()
-        self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, padding = final_conv_kernel_size // 2)
+        self.final_conv = nn.Conv2d(final_conv_dim_in, self.channels_out, final_conv_kernel_size, stride = final_conv_kernel_stride, padding = final_conv_kernel_size // 2)
 
         if zero_proj_out:
             nn.init.zeros_(self.final_conv.weight)
