@@ -1,11 +1,13 @@
 from math import sqrt
 from contextlib import contextmanager
+import random
 from typing import List
 from tqdm import tqdm
 
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
+import torchvision.transforms.functional
 import torchvision.transforms as T
 
 from einops import rearrange, repeat, reduce
@@ -48,6 +50,7 @@ class ElucidatedImagen(nn.Module):
         text_embed_dim = None,
         channels = 3,
         cond_drop_prob = 0.1,
+        lowres_random_blur = 0.0,                   # allow for randomly blurring the low res conditioning image
         lowres_sample_noise_level = 0.2,            # in the paper, they present a new trick where they noise the lowres conditioning image, and at sample time, fix it to a certain level (0.1 or 0.3) - the unets are also made to be conditioned on this noise level
         per_sample_random_aug_noise_level = False,  # unclear when conditioning on augmentation noise level, whether each batch element receives a random aug noise value - turning off due to @marunine's find
         condition_on_text = True,
@@ -125,6 +128,7 @@ class ElucidatedImagen(nn.Module):
         lowres_conditions = tuple(map(lambda t: t.lowres_cond, self.unets))
         assert lowres_conditions == (False, *((True,) * (num_unets - 1))), 'the first unet must be unconditioned (by low resolution image), and the rest of the unets must have `lowres_cond` set to True'
 
+        self.lowres_random_blur = lowres_random_blur
         self.lowres_sample_noise_level = lowres_sample_noise_level
         self.per_sample_random_aug_noise_level = per_sample_random_aug_noise_level
 
@@ -512,6 +516,15 @@ class ElucidatedImagen(nn.Module):
         lowres_cond_img = lowres_aug_times = None
         if exists(prev_image_size):
             lowres_cond_img = resize_image_to(images, prev_image_size)
+
+            if self.lowres_random_blur > 0.0 and random.random() < self.lowres_random_blur:
+                sigma = random.uniform(0.3, 0.7)
+                kernel_size = random.choice([3, 5, 7, 9])
+
+                with torch.cuda.amp.autocast(enabled = False):
+                    lowres_cond_img = torchvision.transforms.functional.gaussian_blur(
+                        lowres_cond_img, kernel_size=kernel_size, sigma=sigma)
+
             lowres_cond_img = resize_image_to(lowres_cond_img, target_image_size)
             lowres_aug_times = get_lowres_aug_times()
 
