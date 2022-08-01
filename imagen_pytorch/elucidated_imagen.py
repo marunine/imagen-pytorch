@@ -555,23 +555,27 @@ class ElucidatedImagen(nn.Module):
 
         # get prediction
 
-        net_out = unet.forward(
-            self.c_in(sigma_data, padded_sigmas) * noised_images,
-            self.c_noise(sigmas),
+        denoised_images = self.preconditioned_network_forward(
+            unet.forward,
+            noised_images,
+            sigmas,
+            sigma_data = sigma_data,
             text_embeds = text_embeds,
             text_mask = text_masks,
             cond_images = cond_images,
-            lowres_cond_img = lowres_cond_img_noisy,
             lowres_noise_times = self.lowres_noise_schedule.get_condition(lowres_aug_times),
+            lowres_cond_img = lowres_cond_img_noisy,
             cond_drop_prob = self.cond_drop_prob,
         )
 
         # losses
 
-        target = (images - self.c_skip(sigma_data, padded_sigmas) * noised_images) / self.c_out(sigma_data, padded_sigmas)
-
-        losses = F.mse_loss(net_out, target, reduction = 'none')
+        losses = F.mse_loss(denoised_images, images, reduction = 'none')
         losses = reduce(losses, 'b ... -> b', 'mean')
+
+        # loss weighting
+
+        losses = losses * self.loss_weight(sigma_data, sigmas)
 
         # return average loss
 
