@@ -294,6 +294,8 @@ class ElucidatedImagen(nn.Module):
         *,
         unet_number,
         num_sample_steps,
+        init_images = None,
+        init_images_time = 0.40,
         clamp = True,
         dynamic_threshold = True,
         cond_scale = 1.,
@@ -327,7 +329,10 @@ class ElucidatedImagen(nn.Module):
 
         init_sigma = sigmas[0]
 
-        images = init_sigma * torch.randn(shape, device = self.device)
+        if init_images is not None:
+            images = init_images.to(self.device)
+        else:
+            images = init_sigma * torch.randn(shape, device = self.device)
 
         # unet kwargs
 
@@ -340,6 +345,16 @@ class ElucidatedImagen(nn.Module):
         )
 
         # gradually denoise
+
+        if init_images is not None:
+            time = init_images_time
+            init_skip = int(len(sigmas_and_gammas) * (1.0 - time))
+            sigmas, sigma_nexts, gammas = sigmas_and_gammas[init_skip - 1]
+            sigmas_and_gammas = sigmas_and_gammas[init_skip:]
+
+            noise = torch.randn_like(images)
+            images = images + sigma_nexts * noise
+
 
         for sigma, sigma_next, gamma in tqdm(sigmas_and_gammas, desc = 'sampling time step'):
             sigma, sigma_next, gamma = map(lambda t: t.item(), (sigma, sigma_next, gamma))
@@ -386,6 +401,7 @@ class ElucidatedImagen(nn.Module):
         text_masks = None,
         text_embeds = None,
         cond_images = None,
+        init_images = None,
         batch_size = 1,
         cond_scale = 1.,
         lowres_sample_noise_level = None,
@@ -438,6 +454,7 @@ class ElucidatedImagen(nn.Module):
                     text_embeds = text_embeds,
                     text_mask = text_masks,
                     cond_images = cond_images,
+                    init_images = init_images if not unet.lowres_cond else None,
                     cond_scale = cond_scale,
                     lowres_cond_img = lowres_cond_img,
                     lowres_noise_times = lowres_noise_times,
