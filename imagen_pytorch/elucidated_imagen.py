@@ -349,11 +349,13 @@ class ElucidatedImagen(nn.Module):
         if init_images is not None:
             time = init_images_time
             init_skip = int(len(sigmas_and_gammas) * (1.0 - time))
-            sigmas, sigma_nexts, gammas = sigmas_and_gammas[init_skip - 1]
             sigmas_and_gammas = sigmas_and_gammas[init_skip:]
+            sigmas, sigma_nexts, gammas = sigmas_and_gammas[0]
 
             noise = torch.randn_like(images)
-            images = images + sigma_nexts * noise
+            images = images + noise * sigmas * 0.5
+            # images = images + noise * 
+            # images = images + sigma_nexts * noise
 
 
         for sigma, sigma_next, gamma in tqdm(sigmas_and_gammas, desc = 'sampling time step'):
