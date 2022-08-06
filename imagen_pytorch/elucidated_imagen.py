@@ -361,10 +361,14 @@ class ElucidatedImagen(nn.Module):
         for sigma, sigma_next, gamma in tqdm(sigmas_and_gammas, desc = 'sampling time step'):
             sigma, sigma_next, gamma = map(lambda t: t.item(), (sigma, sigma_next, gamma))
 
-            eps = S_noise * torch.randn(shape, device = self.device) # stochastic sampling
-
+            # stochastic sampling
             sigma_hat = sigma + gamma * sigma
-            images_hat = images + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
+
+            if gamma > 0:
+                eps = S_noise * torch.randn(shape, device = self.device)
+                images_hat = images + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
+            else:
+                images_hat = images
 
             model_output = self.preconditioned_network_forward(
                 unet.forward_with_cond_scale,
