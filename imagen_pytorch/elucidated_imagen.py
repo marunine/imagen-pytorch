@@ -267,6 +267,21 @@ class ElucidatedImagen(nn.Module):
 
     # sampling
 
+    def preconditioned_network_with_cond_scale(
+        self,
+        *args,
+        cond_scale = 1.0,
+        **kwargs
+    ):
+        logits = self.preconditioned_network_forward(*args, **kwargs)
+
+        if cond_scale == 1:
+            return logits
+
+        null_logits = self.preconditioned_network_forward(*args, cond_drop_prob=1.0, **kwargs)
+        return null_logits + (logits - null_logits) * cond_scale
+
+
     # sample schedule
     # equation (5) in the paper
 
@@ -370,8 +385,8 @@ class ElucidatedImagen(nn.Module):
             else:
                 images_hat = images
 
-            model_output = self.preconditioned_network_forward(
-                unet.forward_with_cond_scale,
+            model_output = self.preconditioned_network_with_cond_scale(
+                unet.forward,
                 images_hat,
                 sigma_hat,
                 **unet_kwargs
@@ -384,8 +399,8 @@ class ElucidatedImagen(nn.Module):
             # second order correction, if not the last timestep
 
             if sigma_next != 0:
-                model_output_next = self.preconditioned_network_forward(
-                    unet.forward_with_cond_scale,
+                model_output_next = self.preconditioned_network_with_cond_scale(
+                    unet.forward,
                     images_next,
                     sigma_next,
                     **unet_kwargs
