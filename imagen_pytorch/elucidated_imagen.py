@@ -345,9 +345,9 @@ class ElucidatedImagen(nn.Module):
         init_sigma = sigmas[0]
 
         if init_images is not None:
-            x = init_images.to(self.device)
+            images = init_images.to(self.device)
         else:
-            x = init_sigma * torch.randn(shape, device = self.device)
+            images = init_sigma * torch.randn(shape, device = self.device)
 
         # unet kwargs
 
@@ -367,10 +367,11 @@ class ElucidatedImagen(nn.Module):
             sigmas_and_gammas = sigmas_and_gammas[init_skip:]
             sigmas, sigma_nexts, gammas = sigmas_and_gammas[0]
 
-            noise = torch.randn_like(x)
-            x = x + noise * sigmas * 0.5
+            noise = torch.randn_like(images)
+            images = images + noise * sigmas * 0.5
             # images = images + noise * 
             # images = images + sigma_nexts * noise
+
 
         for sigma, sigma_next, gamma in tqdm(sigmas_and_gammas, desc = 'sampling time step'):
             sigma, sigma_next, gamma = map(lambda t: t.item(), (sigma, sigma_next, gamma))
@@ -380,37 +381,38 @@ class ElucidatedImagen(nn.Module):
 
             if gamma > 0:
                 eps = S_noise * torch.randn(shape, device = self.device)
-                x = x + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
+                images_hat = images + sqrt(sigma_hat ** 2 - sigma ** 2) * eps
+            else:
+                images_hat = images
 
-            denoised = self.preconditioned_network_with_cond_scale(
+            model_output = self.preconditioned_network_with_cond_scale(
                 unet.forward,
-                x,
+                images_hat,
                 sigma_hat,
                 **unet_kwargs
             )
 
-            d = (x - denoised) / sigma_hat
+            denoised_over_sigma = (images_hat - model_output) / sigma_hat
 
-            # Midpoint method, where the midpoint is chosen according to a rho=3 Karras schedule
+            images_next = images_hat + (sigma_next - sigma_hat) * denoised_over_sigma
 
-            sigma_mid = ((sigma_hat ** (1 / 3) + sigma_next ** (1 / 3)) / 2) ** 3
-            dt_1 = sigma_mid - sigma_hat
-            dt_2 = sigma_next - sigma_hat         
+            # second order correction, if not the last timestep
 
-            x_2 = x + d * dt_1
+            if sigma_next != 0:
+                model_output_next = self.preconditioned_network_with_cond_scale(
+                    unet.forward,
+                    images_next,
+                    sigma_next,
+                    **unet_kwargs
+                )
 
-            denoised_2 = self.preconditioned_network_with_cond_scale(
-                unet.forward,
-                x_2,
-                sigma_mid,
-                **unet_kwargs
-            )
+                denoised_prime_over_sigma = (images_next - model_output_next) / sigma_next
+                images_next = images_hat + 0.5 * (sigma_next - sigma_hat) * (denoised_over_sigma + denoised_prime_over_sigma)
 
-            d_2 = (x_2 - denoised_2) / sigma_mid
-            x = x + d_2 * dt_2
+            images = images_next
 
-        x = x.clamp(-1., 1.)
-        return self.unnormalize_img(x)
+        images = images.clamp(-1., 1.)
+        return self.unnormalize_img(images)
 
     @torch.no_grad()
     @eval_decorator
