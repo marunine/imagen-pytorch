@@ -414,7 +414,7 @@ class ElucidatedImagen(nn.Module):
         batch_size = 1,
         cond_scale = 1.,
         lowres_sample_noise_level = None,
-        stop_at_unet_number = None,
+        should_sample_unet = None,
         return_all_unet_outputs = False,
         return_pil_images = False,
         device = None,
@@ -439,7 +439,14 @@ class ElucidatedImagen(nn.Module):
 
         lowres_sample_noise_level = default(lowres_sample_noise_level, self.lowres_sample_noise_level)
 
-        for unet_number, unet, channel, image_size, num_sample_steps, dynamic_threshold in tqdm(zip(range(1, len(self.unets) + 1), self.unets, self.sample_channels, self.image_sizes, self.num_sample_steps, self.dynamic_thresholding)):
+        should_sample_unet = default(should_sample_unet, True)
+        should_sample_unet = cast_tuple(should_sample_unet, len(self.unets))
+
+        img = init_images
+
+        for unet_number, unet, channel, image_size, num_sample_steps, dynamic_threshold, should_sample in tqdm(zip(range(1, len(self.unets) + 1), self.unets, self.sample_channels, self.image_sizes, self.num_sample_steps, self.dynamic_thresholding, should_sample_unet)):
+            if not should_sample:
+                continue
 
             context = self.one_unet_in_gpu(unet = unet) if is_cuda else null_context()
 
@@ -471,9 +478,6 @@ class ElucidatedImagen(nn.Module):
                 )
 
                 outputs.append(img)
-
-            if exists(stop_at_unet_number) and stop_at_unet_number == unet_number:
-                break
 
         output_index = -1 if not return_all_unet_outputs else slice(None) # either return last unet output or all unet outputs
 
