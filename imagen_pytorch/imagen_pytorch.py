@@ -1179,7 +1179,7 @@ class Unet(nn.Module):
         # for eventual cascading diffusion
 
         self.lowres_cond = lowres_cond
-
+        self.inner_conditioning = inner_conditioning
 
         # determine dimensions
 
@@ -1422,9 +1422,11 @@ class Unet(nn.Module):
 
         mid_dim = dims[-1]
 
+        mid_context_dim = cond_dim if inner_conditioning else None 
+
         self.mid_block1 = resnet_klass(mid_dim, mid_dim, cond_dim=cond_dim, heads=cross_attn_heads, dim_head=cross_attn_dim_head,
                                       time_cond_dim=time_cond_dim, groups=resnet_groups[-1])
-        self.mid_attn = EinopsToAndFrom('b c h w', 'b (h w) c', Residual(Attention(mid_dim, **attn_kwargs))) if attend_at_middle else None
+        self.mid_attn = EinopsToAndFrom('b c h w', 'b (h w) c', Residual(Attention(mid_dim, context_dim=mid_context_dim, **attn_kwargs))) if attend_at_middle else None
         self.mid_block2 = resnet_klass(mid_dim, mid_dim, cond_dim=cond_dim, heads=cross_attn_heads, dim_head=cross_attn_dim_head,
                                       time_cond_dim=time_cond_dim, groups=resnet_groups[-1])
 
@@ -1703,7 +1705,8 @@ class Unet(nn.Module):
         x = self.mid_block1(x, t, c)
 
         if exists(self.mid_attn):
-            x = self.mid_attn(x)
+            mid_c = c if self.inner_conditioning else None
+            x = self.mid_attn(x, context=mid_c)
 
         x = self.mid_block2(x, t, c)
 
